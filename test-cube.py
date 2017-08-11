@@ -19,7 +19,14 @@ class Box:
                                  (c[axis[1]] - 0.5) * dy,
                                  (c[axis[2]] - 0.5) * dz)
         writer = GeomVertexWriter(data, "color")
-        for _ in xrange(24): writer.addData4f(face_color)
+        n = len(face_color)
+        if n == 4:
+            for _ in xrange(24): writer.addData4f(face_color)
+        elif n == 6:
+            for i in xrange(6):
+                for _ in xrange(4): writer.addData4f(face_color[i])
+        else:
+            raise ValueError("Invalid face color")
         writer = GeomVertexWriter(data, "texcoord")
         for _ in xrange(6):
             writer.addData2f(0, 0)

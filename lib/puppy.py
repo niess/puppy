@@ -167,10 +167,19 @@ class Map(Builder):
             triangles = GeomTriangles(Geom.UHStatic)
             for i in xrange(ny - 1):
                 for j in xrange(nx - 1):
-                    connect(triangles,
-                      (i * nx + j, i * nx + j + 1, (i + 1) * nx + j + 1))
-                    connect(triangles,
-                      ((i + 1) * nx + j, i * nx + j, (i + 1) * nx + j + 1))
+                    d1 = abs(z[i][j] - z[i + 1][j + 1])
+                    d2 = abs(z[i + 1][j] - z[i][j + 1])
+                    if d1 < d2:
+                        connect(triangles,
+                          (i * nx + j, i * nx + j + 1, (i + 1) * nx + j + 1))
+                        connect(triangles,
+                          ((i + 1) * nx + j, i * nx + j, (i + 1) * nx + j + 1))
+                    else:
+                        connect(triangles,
+                          (i * nx + j, i * nx + j + 1, (i + 1) * nx + j))
+                        connect(triangles,
+                          ((i + 1) * nx + j + 1, (i + 1) * nx + j,
+                          i * nx + j + 1))
 
             # Build the Geom for the faces and initialise the node.
             self.faces = Geom(data)

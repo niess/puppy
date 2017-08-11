@@ -1,58 +1,62 @@
 from panda3d.core import *
 
+def connect(object, indices):
+    """Connect the vertices of a GeomPrimitive
+    """
+    for index in indices:
+        object.addVertex(index)
+    object.closePrimitive()
+
 class Box(NodePath):
     """3D box builder from Panda primitives.
     """
     def __init__(self, dx, dy, dz, face_color=(1,1,1,1), line_color=(0,0,0,1),
-      texture=None):
+      texture=None, name="box"):
+
+        node = None
+
         # Build the data vector for the faces.
-        format = GeomVertexFormat.getV3c4t2()
-        data = GeomVertexData("vertices", format, Geom.UHStatic)
-        data.setNumRows(24)
-        writer = GeomVertexWriter(data, "vertex")
-        for axis in ((0, 1, 2), (1, 2, 0), (2, 0, 1)):
-            for c in ((0, 0, 0), (0, 1, 0), (1, 1, 0), (1, 0, 0)):
-                writer.addData3f((c[axis[0]] - 0.5) * dx,
-                                 (c[axis[1]] - 0.5) * dy,
-                                 (c[axis[2]] - 0.5) * dz)
-            for c in ((0, 0, 1), (1, 0, 1), (1, 1, 1), (0, 1, 1)):
-                writer.addData3f((c[axis[0]] - 0.5) * dx,
-                                 (c[axis[1]] - 0.5) * dy,
-                                 (c[axis[2]] - 0.5) * dz)
-        writer = GeomVertexWriter(data, "color")
-        n = len(face_color)
-        if n == 4:
-            for _ in xrange(24): writer.addData4f(face_color)
-        elif n == 6:
+        if face_color is not None:
+            format = GeomVertexFormat.getV3c4t2()
+            data = GeomVertexData("vertices", format, Geom.UHStatic)
+            data.setNumRows(24)
+            writer = GeomVertexWriter(data, "vertex")
+            for axis in ((0, 1, 2), (1, 2, 0), (2, 0, 1)):
+                for c in ((0, 0, 0), (0, 1, 0), (1, 1, 0), (1, 0, 0)):
+                    writer.addData3f((c[axis[0]] - 0.5) * dx,
+                                     (c[axis[1]] - 0.5) * dy,
+                                     (c[axis[2]] - 0.5) * dz)
+                for c in ((0, 0, 1), (1, 0, 1), (1, 1, 1), (0, 1, 1)):
+                    writer.addData3f((c[axis[0]] - 0.5) * dx,
+                                     (c[axis[1]] - 0.5) * dy,
+                                     (c[axis[2]] - 0.5) * dz)
+            writer = GeomVertexWriter(data, "color")
+            n = len(face_color)
+            if n == 4:
+                for _ in xrange(24): writer.addData4f(face_color)
+            elif n == 6:
+                for i in xrange(6):
+                    for _ in xrange(4): writer.addData4f(face_color[i])
+            else:
+                raise ValueError("Invalid face color")
+            writer = GeomVertexWriter(data, "texcoord")
+            for _ in xrange(6):
+                writer.addData2f(0, 0)
+                writer.addData2f(1, 0)
+                writer.addData2f(1, 1)
+                writer.addData2f(0, 1)
+
+            # Build the triangles.
+            triangles = GeomTriangles(Geom.UHStatic)
             for i in xrange(6):
-                for _ in xrange(4): writer.addData4f(face_color[i])
-        else:
-            raise ValueError("Invalid face color")
-        writer = GeomVertexWriter(data, "texcoord")
-        for _ in xrange(6):
-            writer.addData2f(0, 0)
-            writer.addData2f(1, 0)
-            writer.addData2f(1, 1)
-            writer.addData2f(0, 1)
+                connect(triangles, (4 * i + 1, 4 * i + 2, 4 * i))
+                connect(triangles, (4 * i + 2, 4 * i + 3, 4 * i))
 
-        def connect(object, indices):
-            """Connect the vertices of a GeomPrimitive
-            """
-            for index in indices:
-                object.addVertex(index)
-            object.closePrimitive()
-
-        # Build the triangles.
-        triangles = GeomTriangles(Geom.UHStatic)
-        for i in xrange(6):
-            connect(triangles, (4 * i + 1, 4 * i + 2, 4 * i))
-            connect(triangles, (4 * i + 2, 4 * i + 3, 4 * i))
-
-        # Build the Geom for the faces and initialise the node.
-        self.faces = Geom(data)
-        self.faces.addPrimitive(triangles)
-        node = GeomNode("box")
-        node.addGeom(self.faces)
+            # Build the Geom for the faces and initialise the node.
+            self.faces = Geom(data)
+            self.faces.addPrimitive(triangles)
+            if node is None: node = GeomNode(name)
+            node.addGeom(self.faces)
 
         # Build the data vector for the border lines.
         if line_color is not None:
@@ -86,9 +90,11 @@ class Box(NodePath):
             # Build the Geom for the borders and add it to the node.
             self.borders = Geom(data)
             self.borders.addPrimitive(lines)
+            if node is None: node = GeomNode(name)
             node.addGeom(self.borders)
 
         # Render the node.
+        if node is None: raise ValueError("empty box")
         self = render.attachNewNode(node)
         if texture is not None:
             self.setTexture(texture)

@@ -7,8 +7,9 @@ class MyApp(ShowBase):
         ShowBase.__init__(self)
 
         # Create a box.
+        self.box = Box(10., 10., 10.).render()
         texture = loader.loadTexture("maps/envir-reeds.png")
-        self.box = Box(10., 10., 10., texture=texture)
+        self.box.setTexture(texture)
 
 app = MyApp()
 app.run()

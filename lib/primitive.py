@@ -1,22 +1,38 @@
 from panda3d.core import *
 
-def connect(object, indices):
+def connect(object, indices, offset=0):
     """Connect the vertices of a GeomPrimitive
     """
     for index in indices:
-        object.addVertex(index)
+        object.addVertex(index + offset)
     object.closePrimitive()
 
-class Box(NodePath):
+class Builder:
+
+    def __init__(self):
+        self.node = None
+        self.path = None
+
+    def render(self):
+        """Render the GeomNode.
+
+        Return: a NodePath to the rendered object.
+        """
+        if self.node is None:
+            raise ValueError("empty GeomNode")
+        if self.path is None:
+            self.path = render.attachNewNode(self.node)
+        return self.path
+
+class Box(Builder):
     """3D box builder from Panda primitives.
     """
     def __init__(self, dx, dy, dz, face_color=(1,1,1,1), line_color=(0,0,0,1),
-      texture=None, name="box"):
+      name="box"):
+        Builder.__init__(self)
 
-        node = None
-
-        # Build the data vector for the faces.
         if face_color is not None:
+            # Build the data vector for the faces.
             format = GeomVertexFormat.getV3c4t2()
             data = GeomVertexData("vertices", format, Geom.UHStatic)
             data.setNumRows(24)
@@ -55,11 +71,11 @@ class Box(NodePath):
             # Build the Geom for the faces and initialise the node.
             self.faces = Geom(data)
             self.faces.addPrimitive(triangles)
-            if node is None: node = GeomNode(name)
-            node.addGeom(self.faces)
+            if self.node is None: self.node = GeomNode(name)
+            self.node.addGeom(self.faces)
 
-        # Build the data vector for the border lines.
         if line_color is not None:
+            # Build the data vector for the border lines.
             format = GeomVertexFormat.getV3c4()
             data = GeomVertexData("vertices", format, Geom.UHStatic)
             data.setNumRows(8)
@@ -72,7 +88,7 @@ class Box(NodePath):
             writer = GeomVertexWriter(data, "color")
             for _ in xrange(8): writer.addData4f(line_color)
 
-            # Build the skeleton.
+            # Build the border lines.
             lines = GeomLines(Geom.UHStatic)
             connect(lines, (0,1))
             connect(lines, (0,2))
@@ -88,13 +104,82 @@ class Box(NodePath):
             connect(lines, (6,7))
 
             # Build the Geom for the borders and add it to the node.
-            self.borders = Geom(data)
-            self.borders.addPrimitive(lines)
-            if node is None: node = GeomNode(name)
-            node.addGeom(self.borders)
+            self.lines = Geom(data)
+            self.lines.addPrimitive(lines)
+            if self.node is None: self.node = GeomNode(name)
+            self.node.addGeom(self.lines)
 
-        # Render the node.
-        if node is None: raise ValueError("empty box")
-        self = render.attachNewNode(node)
-        if texture is not None:
-            self.setTexture(texture)
+class Map(Builder):
+    """3D map builder from Panda primitives.
+    """
+    def __init__(self, x, y, z, face_color=(1,1,1,1), line_color=(0,0,0,1),
+      texture=None, name="map"):
+        Builder.__init__(self)
+        nx, ny = len(x), len(y)
+        n = nx * ny
+
+        if face_color is not None:
+            # Build the data vector for the faces.
+            format = GeomVertexFormat.getV3c4t2()
+            data = GeomVertexData("vertices", format, Geom.UHStatic)
+            data.setNumRows(n)
+            writer = GeomVertexWriter(data, "vertex")
+            for i, yi in enumerate(y):
+                for j, xj in enumerate(x):
+                    writer.addData3f(xj, yi, z[i,j])
+            writer = GeomVertexWriter(data, "color")
+            try:
+                if len(face_color[0]) != nx:
+                    raise ValueError("Invalid face colors")
+            except TypeError:
+                for _ in xrange(n): writer.addData4f(face_color)
+            else:
+                for i in xrange(ny):
+                    for j in xrange(nx):
+                        writer.addData4f(face_color[i][j])
+            writer = GeomVertexWriter(data, "texcoord")
+            for i in xrange(ny):
+                for j in xrange(nx):
+                    writer.addData2f(j, i)
+
+            # Build the triangles.
+            triangles = GeomTriangles(Geom.UHStatic)
+            for i in xrange(ny - 1):
+                for j in xrange(nx - 1):
+                    connect(triangles,
+                      (i * nx + j, i * nx + j + 1, (i + 1) * nx + j + 1))
+                    connect(triangles,
+                      ((i + 1) * nx + j, i * nx + j, (i + 1) * nx + j + 1))
+
+            # Build the Geom for the faces and initialise the node.
+            self.faces = Geom(data)
+            self.faces.addPrimitive(triangles)
+            if self.node is None: self.node = GeomNode(name)
+            self.node.addGeom(self.faces)
+
+        if line_color is not None:
+            # Build the data vector for the lines.
+            format = GeomVertexFormat.getV3c4()
+            data = GeomVertexData("vertices", format, Geom.UHStatic)
+            data.setNumRows(n)
+            writer = GeomVertexWriter(data, "vertex")
+            for i, yi in enumerate(y):
+                for j, xj in enumerate(x):
+                    writer.addData3f(xj, yi, z[i,j])
+            writer = GeomVertexWriter(data, "color")
+            for _ in xrange(n): writer.addData4f(line_color)
+
+            # Build the lines.
+            lines = GeomLines(Geom.UHStatic)
+            for i in xrange(ny):
+                for j in xrange(nx - 1):
+                    connect(lines, (j,j + 1), i * nx)
+            for j in xrange(nx):
+                for i in xrange(ny - 1):
+                    connect(lines, (i * nx,(i + 1) * nx), j)
+
+            # Build the Geom for lines and add it to the node.
+            self.lines = Geom(data)
+            self.lines.addPrimitive(lines)
+            if self.node is None: self.node = GeomNode(name)
+            self.node.addGeom(self.lines)

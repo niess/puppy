@@ -1,2 +1,6 @@
 # Ignore Panda3D examples.
 examples
+
+# Ignore python's bytecode objects.
+lib/*.pyc
+lib/*.pyo

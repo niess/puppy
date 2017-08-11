@@ -1,7 +1,8 @@
-from direct.showbase.ShowBase import ShowBase
 from panda3d.core import *
 
-class Box:
+class Box(NodePath):
+    """3D box builder from Panda primitives.
+    """
     def __init__(self, dx, dy, dz, face_color=(1,1,1,1), line_color=(0,0,0,1),
       texture=None):
         # Build the data vector for the faces.
@@ -88,17 +89,6 @@ class Box:
             node.addGeom(self.borders)
 
         # Render the node.
-        self.node = render.attachNewNode(node)
+        self = render.attachNewNode(node)
         if texture is not None:
-            self.node.setTexture(texture)
-
-class MyApp(ShowBase):
-    def __init__(self):
-        ShowBase.__init__(self)
-
-        # Create a box.
-        texture = loader.loadTexture("maps/envir-reeds.png")
-        self.box = Box(10., 10., 10., texture=texture)
-
-app = MyApp()
-app.run()
+            self.setTexture(texture)

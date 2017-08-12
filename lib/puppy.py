@@ -48,8 +48,8 @@ class Builder:
 class Box(Builder):
     """3D box builder from Panda primitives.
     """
-    def __init__(self, dx, dy, dz, face_color=(1,1,1,1), line_color=(0,0,0,1),
-      name="box"):
+    def __init__(self, dx, dy, dz, name="box", face_color=(1,1,1,1),
+      line_color=(0,0,0,1), texture_scale=None):
         Builder.__init__(self)
 
         if face_color is not None:
@@ -77,11 +77,18 @@ class Box(Builder):
             else:
                 raise ValueError("Invalid face color")
             writer = GeomVertexWriter(data, "texcoord")
-            for _ in xrange(6):
+            dmax = max(dx, dy, dz)
+            for i, (dc0, dc1) in enumerate(((dx,dy), (dy,dx), (dz,dx), (dx,dz),
+              (dy,dz), (dz,dy))):
+                if texture_scale is None:
+                    r0 = dc0 / dmax
+                    r1 = dc1 / dmax
+                else:
+                    r0, r1 = texture_scale[i]
                 writer.addData2f(0, 0)
-                writer.addData2f(1, 0)
-                writer.addData2f(1, 1)
-                writer.addData2f(0, 1)
+                writer.addData2f(0, r1)
+                writer.addData2f(r0, r1)
+                writer.addData2f(r0, 0)
 
             # Build the triangles.
             triangles = GeomTriangles(Geom.UHStatic)

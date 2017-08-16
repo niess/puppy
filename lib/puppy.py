@@ -45,12 +45,35 @@ class Builder:
             self.path = render.attachNewNode(self.node)
         return self.path
 
+    def frame(self):
+        """Return the local frame of the rendered object.
+        """
+        if self.path is not None:
+            M = self.path.getMat()
+            origin = M.xformPoint(self.origin)
+            basis = tuple([M.xformVec(v) for v in self.basis])
+        else:
+            origin, basis = self.origin, self.basis
+        return origin, basis
+
+    def coordinates(self, point):
+        """Return the local coordinates of the given point.
+        """
+        origin, basis = self.frame()
+        c = []
+        for b in basis:
+            c.append(sum((point[i] - origin[i]) * b[i]))
+        return tuple(b)
+
 class Box(Builder):
     """3D box builder from Panda primitives.
     """
     def __init__(self, dx, dy, dz, name="box", face_color=(1,1,1,1),
       line_color=(0,0,0,1), texture_scale=None):
         Builder.__init__(self)
+
+        self.origin = (-0.5 * dx, -0.5 * dy, -0.5 * dz)
+        self.basis = ((1. / dx, 0., 0.), (0., 1. / dy, 0.), (0., 0., 1. / dz))
 
         if face_color is not None:
             # Build the data vector for the faces.
@@ -149,6 +172,14 @@ class TriangularTube(Builder):
         u2 = (section[2][0] - section[0][0], section[2][1] - section[0][1])
         c = u1[0] * u2[1] - u1[1] * u2[0]
         if c > 0: section = (section[0], section[2], section[1])
+
+        self.origin = (section[2][0], section[2][1], 0.)
+        d = (section[1][1] - section[2][1]) * (section[0][0] - section[2][0])
+        d += (section[2][0] - section[1][0]) * (section[0][1] - section[2][1])
+        self.basis = (((section[1][1] - section[2][1]) / d,
+          (section[2][0] - section[1][0]) / d, 0.),
+          ((section[2][1] - section[0][1]) / d,
+          (section[0][0] - section[2][0]) / d, 0.), (0., 0., 1. / length))
 
         if face_color is not None:
             # Build the data vector for the faces.

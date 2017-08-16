@@ -65,101 +65,6 @@ class Builder:
             c.append(sum((point[i] - origin[i]) * b[i]))
         return tuple(b)
 
-class Box(Builder):
-    """3D box builder from Panda primitives.
-    """
-    def __init__(self, dx, dy, dz, name="box", face_color=(1,1,1,1),
-      line_color=(0,0,0,1), texture_scale=None):
-        Builder.__init__(self)
-
-        self.origin = (-0.5 * dx, -0.5 * dy, -0.5 * dz)
-        self.basis = ((1. / dx, 0., 0.), (0., 1. / dy, 0.), (0., 0., 1. / dz))
-
-        if face_color is not None:
-            # Build the data vector for the faces.
-            format = GeomVertexFormat.getV3c4t2()
-            data = GeomVertexData("vertices", format, Geom.UHStatic)
-            data.setNumRows(24)
-            writer = GeomVertexWriter(data, "vertex")
-            for axis in ((0, 1, 2), (1, 2, 0), (2, 0, 1)):
-                for c in ((0, 0, 0), (0, 1, 0), (1, 1, 0), (1, 0, 0)):
-                    writer.addData3f((c[axis[0]] - 0.5) * dx,
-                                     (c[axis[1]] - 0.5) * dy,
-                                     (c[axis[2]] - 0.5) * dz)
-                for c in ((0, 0, 1), (1, 0, 1), (1, 1, 1), (0, 1, 1)):
-                    writer.addData3f((c[axis[0]] - 0.5) * dx,
-                                     (c[axis[1]] - 0.5) * dy,
-                                     (c[axis[2]] - 0.5) * dz)
-            writer = GeomVertexWriter(data, "color")
-            n = len(face_color)
-            if n == 4:
-                for _ in xrange(24): writer.addData4f(face_color)
-            elif n == 6:
-                for i in xrange(6):
-                    for _ in xrange(4): writer.addData4f(face_color[i])
-            else:
-                raise ValueError("Invalid face color")
-            writer = GeomVertexWriter(data, "texcoord")
-            dmax = max(dx, dy, dz)
-            for i, (dc0, dc1) in enumerate(((dx,dy), (dy,dx), (dz,dx), (dx,dz),
-              (dy,dz), (dz,dy))):
-                if texture_scale is None:
-                    r0 = dc0 / dmax
-                    r1 = dc1 / dmax
-                else:
-                    r0, r1 = texture_scale[i]
-                writer.addData2f(0, 0)
-                writer.addData2f(0, r1)
-                writer.addData2f(r0, r1)
-                writer.addData2f(r0, 0)
-
-            # Build the triangles.
-            triangles = GeomTriangles(Geom.UHStatic)
-            for i in xrange(6):
-                connect(triangles, (4 * i + 1, 4 * i + 2, 4 * i))
-                connect(triangles, (4 * i + 2, 4 * i + 3, 4 * i))
-
-            # Build the Geom for the faces and initialise the node.
-            self.faces = Geom(data)
-            self.faces.addPrimitive(triangles)
-            if self.node is None: self.node = GeomNode(name)
-            self.node.addGeom(self.faces)
-
-        if line_color is not None:
-            # Build the data vector for the border lines.
-            format = GeomVertexFormat.getV3c4()
-            data = GeomVertexData("vertices", format, Geom.UHStatic)
-            data.setNumRows(8)
-            writer = GeomVertexWriter(data, "vertex")
-            for i in xrange(2):
-                for j in xrange(2):
-                    for k in xrange(2):
-                        writer.addData3f(
-                          (i - 0.5) * dx, (j - 0.5) * dy, (k - 0.5) * dz)
-            writer = GeomVertexWriter(data, "color")
-            for _ in xrange(8): writer.addData4f(line_color)
-
-            # Build the border lines.
-            lines = GeomLines(Geom.UHStatic)
-            connect(lines, (0,1))
-            connect(lines, (0,2))
-            connect(lines, (0,4))
-            connect(lines, (3,1))
-            connect(lines, (3,2))
-            connect(lines, (3,7))
-            connect(lines, (5,1))
-            connect(lines, (5,4))
-            connect(lines, (5,7))
-            connect(lines, (6,2))
-            connect(lines, (6,4))
-            connect(lines, (6,7))
-
-            # Build the Geom for the borders and add it to the node.
-            self.lines = Geom(data)
-            self.lines.addPrimitive(lines)
-            if self.node is None: self.node = GeomNode(name)
-            self.node.addGeom(self.lines)
-
 class TriangularTube(Builder):
     """Builder for a tube with a triangular section.
     """
@@ -227,8 +132,13 @@ class TriangularTube(Builder):
                     writer.addData2f(d / dmax, length / dmax)
                     writer.addData2f(0., length / dmax)
             else:
-                for i in xrange(5):
-                    r0, r1 = texture_scale[0]
+                for i in xrange(0,2):
+                    w0, w1, w2 = texture_scale[i]
+                    writer.addData2f(w0)
+                    writer.addData2f(w1)
+                    writer.addData2f(w2)
+                for i in xrange(2,5):
+                    r0, r1 = texture_scale[i]
                     writer.addData2f(0., 0.)
                     writer.addData2f(r0, 0.)
                     writer.addData2f(r0, r1)
@@ -252,17 +162,12 @@ class TriangularTube(Builder):
             # Build the data vector for the border lines.
             format = GeomVertexFormat.getV3c4()
             data = GeomVertexData("vertices", format, Geom.UHStatic)
-            data.setNumRows(18)
+            data.setNumRows(6)
             writer = GeomVertexWriter(data, "vertex")
             for x, y in section: writer.addData3f(x,y,0)
             for x, y in section: writer.addData3f(x,y,length)
-            for indices in ((0,1), (1,2), (2,0)):
-                for index in indices:
-                    writer.addData3f(section[index][0],section[index][1],0)
-                for index in indices[::-1]:
-                    writer.addData3f(section[index][0],section[index][1],length)
             writer = GeomVertexWriter(data, "color")
-            for _ in xrange(18): writer.addData4f(line_color)
+            for _ in xrange(6): writer.addData4f(line_color)
 
             # Build the border lines.
             lines = GeomLines(Geom.UHStatic)
@@ -281,6 +186,144 @@ class TriangularTube(Builder):
             self.lines.addPrimitive(lines)
             if self.node is None: self.node = GeomNode(name)
             self.node.addGeom(self.lines)
+
+class ParallelepipedicTube(Builder):
+    """Builder for a tube with a parallelepipedic section.
+    """
+    def __init__(self, section, length, name="parallelepipedic-tube",
+      face_color=(1,1,1,1), line_color=(0,0,0,1), texture_scale=None):
+        Builder.__init__(self)
+
+        # check the orientation of the parallelepipedic section.
+        u1 = (section[1][0] - section[0][0], section[1][1] - section[0][1])
+        u2 = (section[2][0] - section[0][0], section[2][1] - section[0][1])
+        c = u1[0] * u2[1] - u1[1] * u2[0]
+        if c > 0: section = (section[0], section[2], section[1])
+
+        # Complete the section.
+        edge = tuple([ section[1][i] + section[2][i] - section[0][i]
+          for i in xrange(2) ])
+        section = (section[0], section[1], section[2], edge)
+
+        # Set the local frame.
+        self.origin = (section[0][0], section[0][1], -0.5 * length)
+        d = (section[2][1] - section[0][1]) * (section[1][0] - section[0][0])
+        d += (section[0][0] - section[2][0]) * (section[1][1] - section[0][1])
+        self.basis = (((section[2][1] - section[0][1]) / d,
+          (section[0][0] - section[2][0]) / d, 0.),
+          ((section[0][1] - section[1][1]) / d,
+          (section[1][0] - section[0][0]) / d, 0.), (0., 0., 1. / length))
+
+        if face_color is not None:
+            # Build the data vector for the faces.
+            format = GeomVertexFormat.getV3c4t2()
+            data = GeomVertexData("vertices", format, Geom.UHStatic)
+            data.setNumRows(24)
+            writer = GeomVertexWriter(data, "vertex")
+            for x, y in section: writer.addData3f(x,y,-0.5 * length)
+            for x, y in section: writer.addData3f(x,y,0.5 * length)
+            for indices in ((0,1), (2,0), (1,3), (3,2)):
+                for index in indices:
+                    writer.addData3f(section[index][0],section[index][1],
+                      -0.5 * length)
+                for index in indices[::-1]:
+                    writer.addData3f(section[index][0],section[index][1],
+                      0.5 * length)
+            writer = GeomVertexWriter(data, "color")
+            n = len(face_color)
+            if n == 4:
+                for _ in xrange(24): writer.addData4f(face_color)
+            elif n == 6:
+                for i in xrange(6):
+                    for _ in xrange(4): writer.addData4f(face_color[i])
+            else:
+                raise ValueError("Invalid face color")
+            writer = GeomVertexWriter(data, "texcoord")
+            if texture_scale is None:
+                xmax = max(v[0] for v in section)
+                xmin = min(v[0] for v in section)
+                dx = xmax - xmin
+                ymax = max(v[1] for v in section)
+                ymin = min(v[1] for v in section)
+                dy = ymax - ymin
+                dmax = max(dx, dy, length)
+                r0 = dx / dmax
+                r1 = dy / dmax
+                for _ in xrange(2):
+                    for (x,y) in section:
+                        writer.addData2f((x - xmin) / dmax, (y - ymin) / dmax)
+                for index in ((0,1), (2,0), (1,3), (3,2)):
+                    d = ((section[index[0]][0] - section[index[1]][0])**2 +
+                         (section[index[0]][1] - section[index[1]][1])**2)**0.5
+                    writer.addData2f(0., 0.)
+                    writer.addData2f(d / dmax, 0.)
+                    writer.addData2f(d / dmax, length / dmax)
+                    writer.addData2f(0., length / dmax)
+            else:
+                for i in xrange(6):
+                    r0, r1 = texture_scale[0]
+                    writer.addData2f(0., 0.)
+                    writer.addData2f(r0, 0.)
+                    writer.addData2f(r0, r1)
+                    writer.addData2f(0., r1)
+
+            # Build the triangles.
+            triangles = GeomTriangles(Geom.UHStatic)
+            connect(triangles, (0, 1, 2))
+            connect(triangles, (3, 2, 1))
+            connect(triangles, (0, 2, 1), 4)
+            connect(triangles, (3, 1, 2), 4)
+            for i in xrange(4):
+                connect(triangles, (4 * i + 2, 4 * i + 1, 4 * i), 8)
+                connect(triangles, (4 * i + 3, 4 * i + 2, 4 * i), 8)
+
+            # Build the Geom for the faces and initialise the node.
+            self.faces = Geom(data)
+            self.faces.addPrimitive(triangles)
+            if self.node is None: self.node = GeomNode(name)
+            self.node.addGeom(self.faces)
+
+        if line_color is not None:
+            # Build the data vector for the border lines.
+            format = GeomVertexFormat.getV3c4()
+            data = GeomVertexData("vertices", format, Geom.UHStatic)
+            data.setNumRows(8)
+            writer = GeomVertexWriter(data, "vertex")
+            for x, y in section: writer.addData3f(x,y,-0.5 * length)
+            for x, y in section: writer.addData3f(x,y,0.5 * length)
+            writer = GeomVertexWriter(data, "color")
+            for _ in xrange(8): writer.addData4f(line_color)
+
+            # Build the border lines.
+            lines = GeomLines(Geom.UHStatic)
+            connect(lines, (0,1))
+            connect(lines, (0,2))
+            connect(lines, (1,3))
+            connect(lines, (3,2))
+            connect(lines, (0,1),4)
+            connect(lines, (0,2),4)
+            connect(lines, (1,3),4)
+            connect(lines, (3,2),4)
+            connect(lines, (0,4))
+            connect(lines, (1,5))
+            connect(lines, (2,6))
+            connect(lines, (3,7))
+
+            # Build the Geom for the borders and add it to the node.
+            self.lines = Geom(data)
+            self.lines.addPrimitive(lines)
+            if self.node is None: self.node = GeomNode(name)
+            self.node.addGeom(self.lines)
+
+class Box(ParallelepipedicTube):
+    """3D box builder from a parallelepipedic tube.
+    """
+    def __init__(self, dx, dy, dz, name="box", face_color=(1,1,1,1),
+      line_color=(0,0,0,1), texture_scale=None):
+        section = ((-0.5 * dx, -0.5 * dy), (0.5 * dx, -0.5 * dy),
+                   (-0.5 * dx, 0.5 * dy))
+        ParallelepipedicTube.__init__(self, section, dz, name, face_color,
+          line_color, texture_scale)
 
 class Map(Builder):
     """3D map builder from Panda primitives.

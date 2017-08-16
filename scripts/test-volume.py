@@ -15,9 +15,15 @@ class MyApp(ShowBase):
 
         # Create a tube with a triangular section.
         section = ((0., 0.), (0., 10.), (10., 0.))
-        self.tube = puppy.TriangularTube(section, 10.).render()
-        self.tube.setTexture(texture)
-        self.box.setPos(0., 0., -20.)
+        self.tube0 = puppy.TriangularTube(section, 10.).render()
+        self.tube0.setTexture(texture)
+        self.tube0.setPos(0., 0., -20.)
+
+        # Create a tube with a parallelepipedic section.
+        section = ((0., 0.), (0., 10.), (10., 5.))
+        self.tube1 = puppy.ParallelepipedicTube(section, 10.).render()
+        self.tube1.setTexture(texture)
+        self.tube1.setPos(0., -20., 0.)
 
 app = MyApp()
 app.run()

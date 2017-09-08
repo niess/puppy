@@ -28,8 +28,27 @@ def connect(object, indices, offset=0):
         object.addVertex(index + offset)
     object.closePrimitive()
 
-class Builder:
+def multiply(s, v):
+    """Multiply a vector with a scalar."""
+    return (s * v[0], s * v[1], s * v[2])
 
+def dot(i,j):
+    """Dot product of 2 vectors."""
+    return i[0] * j[0] + i[1] * j[1] + i[2] * j[2]
+
+def cross(i,j):
+    """Cross product of 2 vectors."""
+    return ( i[2] * j[1] - i[1] * j[2], i[0] * j[2] - i[2] * j[0],
+             i[1] * j[0] - i[0] * j[1] )
+
+def det(i,j,k):
+    """Triple product (determinant) of 3 vectors.
+    """
+    return dot(i, cross(j, k))
+
+class Builder:
+    """Base geometry builder from primitives.
+    """
     def __init__(self):
         self.node = None
         self.path = None
@@ -50,41 +69,64 @@ class Builder:
         """
         if self.path is not None:
             M = self.path.getMat()
-            origin = tuple(M.xformPoint(self.origin))
-            basis = tuple([tuple(M.xformVec(v)) for v in self.basis])
+            origin = tuple(M.xformPoint(self._origin))
+            basis = tuple([tuple(M.xformVec(v)) for v in self._basis])
         else:
-            origin, basis = self.origin, self.basis
+            origin, basis = self._origin, self._basis
         return origin, basis
 
-    def coordinates(self, point):
-        """Return the local coordinates of the given point.
+    def barycentric_frame(self):
+        """Return the barycentric frame of the rendered object.
         """
-        origin, basis = self.frame()
+        origin, basis = self._barycentric
+        if self.path is not None:
+            M = self.path.getMat()
+            origin = tuple(M.xformPoint(origin))
+            basis = tuple([tuple(M.xformVec(v)) for v in basis])
+        return origin, basis
+
+    def barycentric_coordinates(self, point):
+        """Return the barycentric coordinates of the given point.
+        """
+        origin, basis = self._barycentric
+        if self.path is not None:
+            M = self.path.getMat()
+            origin = tuple(M.xformPoint(origin))
+            basis = tuple([tuple(M.xformVec(v)) for v in basis])
         c = []
-        for b in basis:
-            c.append(sum((point[i] - origin[i]) * b[i]))
+        u = [ point[i] - origin[i] for i in xrange(3) ]
+        for b in basis: c.append(dot(u, b))
         return tuple(b)
 
-class TriangularTube(Builder):
-    """Builder for a tube with a triangular section.
+class Frame3(Builder):
+    """Builder from a frame with a 3 edges section.
     """
-    def __init__(self, section, length, name="triangular-tube",
+    def __init__(self, frame, name="frame4",
       face_color=(1,1,1,1), line_color=(0,0,0,1), texture_scale=None):
         Builder.__init__(self)
 
-        # check the orientation of the triangular section.
-        u1 = (section[1][0] - section[0][0], section[1][1] - section[0][1])
-        u2 = (section[2][0] - section[0][0], section[2][1] - section[0][1])
-        c = u1[0] * u2[1] - u1[1] * u2[0]
-        if c > 0: section = (section[0], section[2], section[1])
+        # Check the orientation of the section.
+        origin, (v0, v1, v2) = frame
+        n = cross(v0, v1)
+        n = multiply(1. / dot(n, n)**0.5, n)
+        dz = dot(v2, n)
+        if dz < 0.:
+            v0, v1 = v1, v0
+            multiply(-1., n)
+            dz = -dz
+            frame = (origin, (v0, v1, v2))
 
-        self.origin = (section[2][0], section[2][1], 0.)
-        d = (section[1][1] - section[2][1]) * (section[0][0] - section[2][0])
-        d += (section[2][0] - section[1][0]) * (section[0][1] - section[2][1])
-        self.basis = (((section[1][1] - section[2][1]) / d,
-          (section[2][0] - section[1][0]) / d, 0.),
-          ((section[2][1] - section[0][1]) / d,
-          (section[0][0] - section[2][0]) / d, 0.), (0., 0., 1. / length))
+        # Set the local frame and the barycentric transform.
+        self._origin, self._basis = frame
+        dxy = det(v0, v1, n)
+        self._barycentric = (origin,
+          (multiply(1. / dxy, cross(v1, n)), multiply(-1. / dxy, cross(v0, n)),
+           multiply(1. / dz, n)))
+
+        # Build the section.
+        section = (origin,
+          [origin[i] + v0[i] for i in xrange(3)],
+          [origin[i] + v1[i] for i in xrange(3)])
 
         if face_color is not None:
             # Build the data vector for the faces.
@@ -92,13 +134,16 @@ class TriangularTube(Builder):
             data = GeomVertexData("vertices", format, Geom.UHStatic)
             data.setNumRows(18)
             writer = GeomVertexWriter(data, "vertex")
-            for x, y in section: writer.addData3f(x,y,0)
-            for x, y in section: writer.addData3f(x,y,length)
+            for x, y, z in section: writer.addData3f(x, y, z)
+            for x, y, z in section: writer.addData3f(
+              x + v2[0], y + v2[1], z + v2[2])
             for indices in ((0,1), (1,2), (2,0)):
                 for index in indices:
-                    writer.addData3f(section[index][0],section[index][1],0)
+                    writer.addData3f(section[index][0], section[index][1],
+                      section[index][2])
                 for index in indices[::-1]:
-                    writer.addData3f(section[index][0],section[index][1],length)
+                    writer.addData3f(section[index][0] + v2[0],
+                      section[index][1] + v2[1], section[index][2] + v2[2])
             writer = GeomVertexWriter(data, "color")
             n = len(face_color)
             if n == 4:
@@ -112,25 +157,26 @@ class TriangularTube(Builder):
                 raise ValueError("Invalid face color")
             writer = GeomVertexWriter(data, "texcoord")
             if texture_scale is None:
-                xmax = max(v[0] for v in section)
-                xmin = min(v[0] for v in section)
-                dx = xmax - xmin
-                ymax = max(v[1] for v in section)
-                ymin = min(v[1] for v in section)
-                dy = ymax - ymin
-                dmax = max(dx, dy, length)
-                r0 = dx / dmax
-                r1 = dy / dmax
+                L0 = (v0[0]**2 + v0[1]**2 + v0[2]**2)**0.5
+                L12 = v1[0]**2 + v1[1]**2 + v1[2]**2
+                x1 = (v0[0] * v1[0] + v0[1] * v1[1] + v0[2] * v1[2]) / L0
+                y1 = (L12 - x1**2)**0.5
                 for _ in xrange(2):
-                    for (x,y) in section:
-                        writer.addData2f((x - xmin) / dmax, (y - ymin) / dmax)
-                for index in ((0,1), (1,2), (2,0)):
-                    d = ((section[index[0]][0] - section[index[1]][0])**2 +
-                         (section[index[0]][1] - section[index[1]][1])**2)**0.5
                     writer.addData2f(0., 0.)
-                    writer.addData2f(d / dmax, 0.)
-                    writer.addData2f(d / dmax, length / dmax)
-                    writer.addData2f(0., length / dmax)
+                    writer.addData2f(L0, 0.)
+                    writer.addData2f(x1, y1)
+                for index in ((0,1), (1,2), (2,0)):
+                    x0, y0, z0 = section[index[0]]
+                    x1, y1, z1 = section[index[1]]
+                    u0 = (x1 - x0, y1 - y0, z1 - z0)
+                    L0 = (u0[0]**2 + u0[1]**2 + u0[2]**2)**0.5
+                    L12 = v2[0]**2 + v2[1]**2 + v2[2]**2
+                    x1 = (u0[0] * v2[0] + u0[1] * v2[1] + u0[2] * v2[2]) / L0
+                    y1 = (L12 - x1**2)**0.5
+                    writer.addData2f(0., 0.)
+                    writer.addData2f(L0, 0.)
+                    writer.addData2f(L0 + x1, y1)
+                    writer.addData2f(x1, y1)
             else:
                 for i in xrange(0,2):
                     w0, w1, w2 = texture_scale[i]
@@ -164,8 +210,9 @@ class TriangularTube(Builder):
             data = GeomVertexData("vertices", format, Geom.UHStatic)
             data.setNumRows(6)
             writer = GeomVertexWriter(data, "vertex")
-            for x, y in section: writer.addData3f(x,y,0)
-            for x, y in section: writer.addData3f(x,y,length)
+            for x, y, z in section: writer.addData3f(x, y, z)
+            for x, y, z in section: writer.addData3f(
+              x + v2[0], y + v2[1], z + v2[2])
             writer = GeomVertexWriter(data, "color")
             for _ in xrange(6): writer.addData4f(line_color)
 
@@ -187,32 +234,37 @@ class TriangularTube(Builder):
             if self.node is None: self.node = GeomNode(name)
             self.node.addGeom(self.lines)
 
-class ParallelepipedicTube(Builder):
-    """Builder for a tube with a parallelepipedic section.
+class Frame4(Builder):
+    """Builder from a frame with a 4 edges section.
     """
-    def __init__(self, section, length, name="parallelepipedic-tube",
+    def __init__(self, frame, name="frame4",
       face_color=(1,1,1,1), line_color=(0,0,0,1), texture_scale=None):
         Builder.__init__(self)
 
-        # check the orientation of the parallelepipedic section.
-        u1 = (section[1][0] - section[0][0], section[1][1] - section[0][1])
-        u2 = (section[2][0] - section[0][0], section[2][1] - section[0][1])
-        c = u1[0] * u2[1] - u1[1] * u2[0]
-        if c > 0: section = (section[0], section[2], section[1])
+        # Check the orientation of the section.
+        origin, (v0, v1, v2) = frame
+        n = cross(v0, v1)
+        n = multiply(1. / dot(n, n)**0.5, n)
+        dz = dot(v2, n)
+        if dz < 0.:
+            v0, v1 = v1, v0
+            multiply(-1., n)
+            dz = -dz
+            frame = (origin, (v0, v1, v2))
 
-        # Complete the section.
-        edge = tuple([ section[1][i] + section[2][i] - section[0][i]
-          for i in xrange(2) ])
-        section = (section[0], section[1], section[2], edge)
+        # Set the local frame and the barycentric transform.
+        self._origin, self._basis = frame
+        dxy = det(v0, v1, n)
+        self._barycentric = (origin,
+          (multiply(1. / dxy, cross(v1, n)), multiply(-1. / dxy, cross(v0, n)),
+           multiply(1. / dz, n)))
 
-        # Set the local frame.
-        self.origin = (section[0][0], section[0][1], -0.5 * length)
-        d = (section[2][1] - section[0][1]) * (section[1][0] - section[0][0])
-        d += (section[0][0] - section[2][0]) * (section[1][1] - section[0][1])
-        self.basis = (((section[2][1] - section[0][1]) / d,
-          (section[0][0] - section[2][0]) / d, 0.),
-          ((section[0][1] - section[1][1]) / d,
-          (section[1][0] - section[0][0]) / d, 0.), (0., 0., 1. / length))
+        # Build the section.
+        origin, (v0, v1, v2) = frame
+        section = (origin,
+          [origin[i] + v0[i] for i in xrange(3)],
+          [origin[i] + v1[i] for i in xrange(3)],
+          [origin[i] + v0[i] + v1[i] for i in xrange(3)])
 
         if face_color is not None:
             # Build the data vector for the faces.
@@ -220,15 +272,16 @@ class ParallelepipedicTube(Builder):
             data = GeomVertexData("vertices", format, Geom.UHStatic)
             data.setNumRows(24)
             writer = GeomVertexWriter(data, "vertex")
-            for x, y in section: writer.addData3f(x,y,-0.5 * length)
-            for x, y in section: writer.addData3f(x,y,0.5 * length)
+            for x, y, z in section: writer.addData3f(x, y, z)
+            for x, y, z in section: writer.addData3f(
+              x + v2[0], y + v2[1], z + v2[2])
             for indices in ((0,1), (2,0), (1,3), (3,2)):
                 for index in indices:
-                    writer.addData3f(section[index][0],section[index][1],
-                      -0.5 * length)
+                    writer.addData3f(section[index][0], section[index][1],
+                      section[index][2])
                 for index in indices[::-1]:
-                    writer.addData3f(section[index][0],section[index][1],
-                      0.5 * length)
+                    writer.addData3f(section[index][0] + v2[0],
+                      section[index][1] + v2[1], section[index][2] + v2[2])
             writer = GeomVertexWriter(data, "color")
             n = len(face_color)
             if n == 4:
@@ -240,25 +293,27 @@ class ParallelepipedicTube(Builder):
                 raise ValueError("Invalid face color")
             writer = GeomVertexWriter(data, "texcoord")
             if texture_scale is None:
-                xmax = max(v[0] for v in section)
-                xmin = min(v[0] for v in section)
-                dx = xmax - xmin
-                ymax = max(v[1] for v in section)
-                ymin = min(v[1] for v in section)
-                dy = ymax - ymin
-                dmax = max(dx, dy, length)
-                r0 = dx / dmax
-                r1 = dy / dmax
+                L0 = (v0[0]**2 + v0[1]**2 + v0[2]**2)**0.5
+                L12 = v1[0]**2 + v1[1]**2 + v1[2]**2
+                x1 = (v0[0] * v1[0] + v0[1] * v1[1] + v0[2] * v1[2]) / L0
+                y1 = (L12 - x1**2)**0.5
                 for _ in xrange(2):
-                    for (x,y) in section:
-                        writer.addData2f((x - xmin) / dmax, (y - ymin) / dmax)
-                for index in ((0,1), (2,0), (1,3), (3,2)):
-                    d = ((section[index[0]][0] - section[index[1]][0])**2 +
-                         (section[index[0]][1] - section[index[1]][1])**2)**0.5
                     writer.addData2f(0., 0.)
-                    writer.addData2f(d / dmax, 0.)
-                    writer.addData2f(d / dmax, length / dmax)
-                    writer.addData2f(0., length / dmax)
+                    writer.addData2f(L0, 0.)
+                    writer.addData2f(x1, y1)
+                    writer.addData2f(L0 + x1, y1)
+                for index in ((0,1), (2,0), (1,3), (3,2)):
+                    x0, y0, z0 = section[index[0]]
+                    x1, y1, z1 = section[index[1]]
+                    u0 = (x1 - x0, y1 - y0, z1 - z0)
+                    L0 = (u0[0]**2 + u0[1]**2 + u0[2]**2)**0.5
+                    L12 = v2[0]**2 + v2[1]**2 + v2[2]**2
+                    x1 = (u0[0] * v2[0] + u0[1] * v2[1] + u0[2] * v2[2]) / L0
+                    y1 = (L12 - x1**2)**0.5
+                    writer.addData2f(0., 0.)
+                    writer.addData2f(L0, 0.)
+                    writer.addData2f(L0 + x1, y1)
+                    writer.addData2f(x1, y1)
             else:
                 for i in xrange(6):
                     r0, r1 = texture_scale[0]
@@ -289,8 +344,9 @@ class ParallelepipedicTube(Builder):
             data = GeomVertexData("vertices", format, Geom.UHStatic)
             data.setNumRows(8)
             writer = GeomVertexWriter(data, "vertex")
-            for x, y in section: writer.addData3f(x,y,-0.5 * length)
-            for x, y in section: writer.addData3f(x,y,0.5 * length)
+            for x, y, z in section: writer.addData3f(x, y, z)
+            for x, y, z in section: writer.addData3f(
+              x + v2[0], y + v2[1], z + v2[2])
             writer = GeomVertexWriter(data, "color")
             for _ in xrange(8): writer.addData4f(line_color)
 
@@ -314,6 +370,49 @@ class ParallelepipedicTube(Builder):
             self.lines.addPrimitive(lines)
             if self.node is None: self.node = GeomNode(name)
             self.node.addGeom(self.lines)
+
+class TriangularTube(Frame3):
+    """Builder for a tube with a triangular section.
+    """
+    def __init__(self, section, length, name="triangular-tube",
+      face_color=(1,1,1,1), line_color=(0,0,0,1), texture_scale=None):
+        Builder.__init__(self)
+
+        # Build the local frame.
+        origin = (section[0][0], section[0][1], 0.)
+        basis = (
+          (section[1][0] - section[0][0], section[1][1] - section[0][1], 0.),
+          (section[2][0] - section[0][0], section[2][1] - section[0][1], 0.),
+          (0., 0., length))
+        frame = (origin, basis)
+
+        # Build the object.
+        Frame3.__init__(
+          self, frame, name, face_color, line_color, texture_scale)
+
+class ParallelepipedicTube(Frame4):
+    """Builder for a tube with a parallelepipedic section.
+    """
+    def __init__(self, section, length, name="parallelepipedic-tube",
+      face_color=(1,1,1,1), line_color=(0,0,0,1), texture_scale=None):
+        Builder.__init__(self)
+
+        # Complete the section.
+        edge = tuple([ section[1][i] + section[2][i] - section[0][i]
+          for i in xrange(2) ])
+        section = (section[0], section[1], section[2], edge)
+
+        # Build the local frame.
+        origin = (section[0][0], section[0][1], -0.5 * length)
+        basis = (
+          (section[1][0] - section[0][0], section[1][1] - section[0][1], 0.),
+          (section[2][0] - section[0][0], section[2][1] - section[0][1], 0.),
+          (0., 0., length))
+        frame = (origin, basis)
+
+        # Build the object.
+        Frame4.__init__(
+          self, frame, name, face_color, line_color, texture_scale)
 
 class Box(ParallelepipedicTube):
     """3D box builder from a parallelepipedic tube.

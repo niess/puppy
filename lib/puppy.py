@@ -50,8 +50,8 @@ class Builder:
         """
         if self.path is not None:
             M = self.path.getMat()
-            origin = M.xformPoint(self.origin)
-            basis = tuple([M.xformVec(v) for v in self.basis])
+            origin = tuple(M.xformPoint(self.origin))
+            basis = tuple([tuple(M.xformVec(v)) for v in self.basis])
         else:
             origin, basis = self.origin, self.basis
         return origin, basis

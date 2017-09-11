@@ -379,7 +379,7 @@ class TriangularTube(Frame3):
         Builder.__init__(self)
 
         # Build the local frame.
-        origin = (section[0][0], section[0][1], 0.)
+        origin = (section[0][0], section[0][1], -0.5 * length)
         basis = (
           (section[1][0] - section[0][0], section[1][1] - section[0][1], 0.),
           (section[2][0] - section[0][0], section[2][1] - section[0][1], 0.),

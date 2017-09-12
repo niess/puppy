@@ -2,5 +2,5 @@
 examples
 
 # Ignore python's bytecode objects.
-lib/*.pyc
-lib/*.pyo
+lib/puppy/*.pyc
+lib/puppy/*.pyo

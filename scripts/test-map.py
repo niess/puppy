@@ -1,25 +1,28 @@
 #!/usr/bin/env python
-from direct.showbase.ShowBase import ShowBase
 import numpy
-import puppy
+import puppy.build
+import puppy.control
 
-class MyApp(ShowBase):
+class Test(puppy.control.KeyboardCamera):
     def __init__(self):
-        ShowBase.__init__(self)
+        puppy.control.KeyboardCamera.__init__(self)
 
         # Create a map.
         x = numpy.linspace(-10., 10., 21)
         y = numpy.linspace(-10., 10., 21)
         z = numpy.outer(y, x)
-        self.map = puppy.Map(x, y, z).render()
+        self.map = puppy.build.Map(x, y, z).render()
         texture = loader.loadTexture("maps/envir-ground.jpg")
         self.map.setTexture(texture)
 
         # Add a box.
-        self.box = puppy.Box(1., 1., 1.).render()
+        self.box = puppy.build.Box(1., 1., 1.).render()
         texture = loader.loadTexture("maps/envir-reeds.png")
         self.box.setTexture(texture)
         self.box.setPos(0., 0., 10.)
 
-app = MyApp()
-app.run()
+        # Initialise the camera.
+        self.camera.setPos(20., -20., 15.)
+        self.camera.lookAt(self.box)
+
+Test().run()

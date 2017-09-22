@@ -40,17 +40,38 @@ class KeyboardCamera(ShowBase):
               "backward" : m.getMappedButton("s"),
               "left" : m.getMappedButton("a"),
               "right" : m.getMappedButton("d"),
-              "mouse1" : MouseButton.one() }
+              "mouse1" : MouseButton.one(),
+              "mouse3" : MouseButton.three() }
         self.taskMgr.add(self.move, "moveTask")
+        self.reset_acceleration()
+
+    def reset_acceleration(self):
+        self.acceleration = [8., 5.]
 
     def move(self, task):
         # 1st let us check the keys state.
         speed = [0., 0.]
         is_down = self.mouseWatcherNode.isButtonDown
-        if is_down(self.key["forward"]): speed[0] += 8.
-        elif is_down(self.key["backward"]): speed[0] -= 8.
-        if is_down(self.key["left"]): speed[1] -= 5.
-        elif is_down(self.key["right"]): speed[1] += 5.
+
+        moving = True
+        if is_down(self.key["forward"]):
+            speed[0] += self.acceleration[0]
+        elif is_down(self.key["backward"]):
+            speed[0] -= self.acceleration[0]
+        else:
+            moving = False
+        if is_down(self.key["left"]):
+            speed[1] -= self.acceleration[1]
+        elif is_down(self.key["right"]):
+            speed[1] += self.acceleration[1]
+        else:
+            moving = moving or False
+
+        if is_down(self.key["mouse3"]) and moving:
+            self.acceleration[0] += 1
+            self.acceleration[1] += 1
+        else:
+            self.reset_acceleration()
 
         if is_down(self.key["mouse1"]):
             m = self.win.getPointer(0)

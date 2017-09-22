@@ -511,9 +511,39 @@ class Map(Builder):
             self.node.addGeom(self.lines)
 
     def frame(self): raise RuntimeError("not implemented")
-
-    def barycentric_frame(self):
+    def barycentric_frame(self): raise RuntimeError("not implemented")
+    def barycentric_coordinates(self, point):
         raise RuntimeError("not implemented")
 
+class Track(Builder):
+    """3D track builder from Panda primitives.
+    """
+    def __init__(self, vertices, line_color=(0,0,0,1), name="track"):
+        Builder.__init__(self)
+        n = len(vertices)
+
+        # Build the data vector for the line segments.
+        format = GeomVertexFormat.getV3c4()
+        data = GeomVertexData("vertices", format, Geom.UHStatic)
+        data.setNumRows(n)
+        writer = GeomVertexWriter(data, "vertex")
+        for vertex in vertices:
+            writer.addData3f(*vertex)
+        writer = GeomVertexWriter(data, "color")
+        for _ in xrange(n): writer.addData4f(line_color)
+
+        # Connect the segments.
+        lines = GeomLines(Geom.UHStatic)
+        for i in xrange(n - 1):
+            _connect(lines, (i, i + 1))
+
+        # Build the Geom for lines and add it to the node.
+        self.lines = Geom(data)
+        self.lines.addPrimitive(lines)
+        if self.node is None: self.node = GeomNode(name)
+        self.node.addGeom(self.lines)
+
+    def frame(self): raise RuntimeError("not implemented")
+    def barycentric_frame(self): raise RuntimeError("not implemented")
     def barycentric_coordinates(self, point):
         raise RuntimeError("not implemented")

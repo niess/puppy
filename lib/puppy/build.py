@@ -457,7 +457,7 @@ class Map(Builder):
             writer = GeomVertexWriter(data, "texcoord")
             for i in xrange(ny):
                 for j in xrange(nx):
-                    writer.addData2f(j, i)
+                    writer.addData2f(x[j], y[i])
 
             # Build the triangles.
             triangles = GeomTriangles(Geom.UHStatic)

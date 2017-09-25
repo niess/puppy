@@ -430,7 +430,7 @@ class Map(Builder):
     """3D map builder from Panda primitives.
     """
     def __init__(self, x, y, z, face_color=(1,1,1,1), line_color=(0,0,0,1),
-      texture=None, name="map"):
+      name="map"):
         Builder.__init__(self)
         nx, ny = len(x), len(y)
         n = nx * ny
@@ -514,6 +514,41 @@ class Map(Builder):
     def barycentric_frame(self): raise RuntimeError("not implemented")
     def barycentric_coordinates(self, point):
         raise RuntimeError("not implemented")
+
+class Terrain(Builder):
+    """3D terrain builder from maps, implementing a level of details.
+    """
+    def __init__(self, x, y, z, face_color=(1,1,1,1), line_color=(0,0,0,1),
+      name="terrain", lod=3, dlim=50.):
+        Builder.__init__(self)
+        self.node = True
+        self.path = NodePath("Terrain")
+        self.path.reparentTo(render)
+
+        size = 2**lod - 2**(lod - 1) + 1
+        nx, ny = (len(x) - 1) / (size - 1), (len(y) - 1) / (size - 1)
+        yoff = 0
+        for iy in xrange(ny):
+            y2 = y[yoff:(yoff + size)]
+            xoff = 0
+            for ix in xrange(nx):
+                x2 = x[xoff:(xoff + size)]
+                z2 = z[yoff:(yoff + size),xoff:(xoff + size)]
+                ln = LODNode("root")
+                path = NodePath(ln)
+                path.reparentTo(self.path)
+                d = 0.
+                for i in xrange(lod):
+                    p = Map(x2[::2**i], y2[::2**i], z2[::2**i,::2**i],
+                      face_color, line_color, name).render()
+                    if i == 0: di = dlim
+                    elif i == lod - 1: di = 1E+12
+                    else: di = 2 * d
+                    ln.addSwitch(di, d)
+                    d = di
+                    p.reparentTo(path)
+                xoff += size - 1
+            yoff += size - 1
 
 class Track(Builder):
     """3D track builder from Panda primitives.

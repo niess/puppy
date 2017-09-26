@@ -50,6 +50,7 @@ class Builder:
     """Base geometry builder from primitives.
     """
     def __init__(self):
+        self.name = None
         self.node = None
         self.path = None
 
@@ -69,8 +70,9 @@ class Builder:
         """
         if self.path is not None:
             M = self.path.getMat()
-            origin = tuple(M.xformPoint(self._origin))
-            basis = tuple([tuple(M.xformVec(v)) for v in self._basis])
+            origin = tuple(M.xformPoint(LVecBase3f(*self._origin)))
+            basis = tuple([
+              tuple(M.xformVec(LVecBase3f(*v))) for v in self._basis])
         else:
             origin, basis = self._origin, self._basis
         return origin, basis
@@ -81,8 +83,8 @@ class Builder:
         origin, basis = self._barycentric
         if self.path is not None:
             M = self.path.getMat()
-            origin = tuple(M.xformPoint(origin))
-            basis = tuple([tuple(M.xformVec(v)) for v in basis])
+            origin = tuple(M.xformPoint(LVecBase3f(*origin)))
+            basis = tuple([tuple(M.xformVec(LVecBase3f(*v))) for v in basis])
         return origin, basis
 
     def barycentric_coordinates(self, point):
@@ -91,8 +93,8 @@ class Builder:
         origin, basis = self._barycentric
         if self.path is not None:
             M = self.path.getMat()
-            origin = tuple(M.xformPoint(origin))
-            basis = tuple([tuple(M.xformVec(v)) for v in basis])
+            origin = tuple(M.xformPoint(LVecBase3f(*origin)))
+            basis = tuple([tuple(M.xformVec(LVecBase3f(*v))) for v in basis])
         c = []
         u = [ point[i] - origin[i] for i in xrange(3) ]
         for b in basis: c.append(dot(u, b))
@@ -115,6 +117,7 @@ class TriangularTube(Builder):
             section, length = args
         except ValueError:
             frame = args[0]
+        self.name = opts["name"]
 
         # Build the local frame if not provided.
         if frame is None:
@@ -273,6 +276,7 @@ class Parallelepiped(Builder):
             section, length = args
         except ValueError:
             frame = args[0]
+        self.name = opts["name"]
 
         # Build the local frame, if needed.
         if frame is None:
@@ -432,6 +436,7 @@ class Map(Builder):
     def __init__(self, x, y, z, face_color=(1,1,1,1), line_color=(0,0,0,1),
       name="map"):
         Builder.__init__(self)
+        self.name = name
         nx, ny = len(x), len(y)
         n = nx * ny
 
@@ -521,6 +526,7 @@ class Terrain(Builder):
     def __init__(self, x, y, z, face_color=(1,1,1,1), line_color=(0,0,0,1),
       name="terrain", lod=3, dlim=50.):
         Builder.__init__(self)
+        self.name = name
         self.node = True
         self.path = NodePath("Terrain")
         self.path.reparentTo(render)
@@ -555,6 +561,7 @@ class Track(Builder):
     """
     def __init__(self, vertices, line_color=(0,0,0,1), name="track"):
         Builder.__init__(self)
+        self.name = name
         n = len(vertices)
 
         # Build the data vector for the line segments.

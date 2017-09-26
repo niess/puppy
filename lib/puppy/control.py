@@ -53,21 +53,21 @@ class KeyboardCamera(ShowBase):
         speed = [0., 0.]
         is_down = self.mouseWatcherNode.isButtonDown
 
-        moving = True
+        iddle = True
         if is_down(self.key["forward"]):
             speed[0] += self.acceleration[0]
+            iddle = False
         elif is_down(self.key["backward"]):
             speed[0] -= self.acceleration[0]
-        else:
-            moving = False
+            iddle = False
         if is_down(self.key["left"]):
             speed[1] -= self.acceleration[1]
+            iddle = False
         elif is_down(self.key["right"]):
             speed[1] += self.acceleration[1]
-        else:
-            moving = moving or False
+            iddle = False
 
-        if is_down(self.key["mouse3"]) and moving:
+        if is_down(self.key["mouse3"]) and (not iddle):
             self.acceleration[0] += 1
             self.acceleration[1] += 1
         else:

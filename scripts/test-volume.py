@@ -15,16 +15,22 @@ class Test(puppy.control.KeyboardCamera):
         self.box.setPos(0., 0., 2.)
 
         # Create a tube with a triangular section.
-        section = ((0., 0.), (0., 1.), (1., 0.))
-        self.tube = puppy.build.TriangularTube(section, 1.).render()
+        section = ((-0.5, -0.5), (-0.5, 0.5), (0.5, -0.5))
+        self.tube = puppy.build.PolyTube(section, 1.).render()
         self.tube.setTexture(texture)
         self.tube.setPos(0., 0., -2.)
 
         # Create a parallelepiped.
-        section = ((0., 0.), (0., 1.), (1., 0.5))
-        self.parallelepiped = puppy.build.Parallelepiped(section, 1.).render()
+        section = ((-0.5, -0.5), (-0.5, 0.5), (0.5, 1.), (0.5, 0.))
+        self.parallelepiped = puppy.build.PolyTube(section, 1.).render()
         self.parallelepiped.setTexture(texture)
-        self.parallelepiped.setPos(0., -2., 0.)
+        self.parallelepiped.setPos(0., 2., 0.)
+
+        # Create a polytube.
+        section = ((-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (0., 1.), (-0.5, 0.5))
+        self.polytube = puppy.build.PolyTube(section, 1.).render()
+        self.polytube.setTexture(texture)
+        self.polytube.setPos(0., -2., 0.)
 
         # Initialise the camera.
         self.camera.setPos(8., 8., 8.)

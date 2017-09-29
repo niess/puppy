@@ -87,6 +87,9 @@ class PolyTube(Builder):
 
         # Build the 3D section.
         origin, (v0, v1, v2) = frame
+        if length < 0.:
+            v2 = multiply(-1., v2)
+            length = -length
         section = []
         bary = [0., 0., 0.]
         for vertex in vertices:

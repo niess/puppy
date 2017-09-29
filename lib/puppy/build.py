@@ -277,9 +277,13 @@ class PolyTube(Builder):
 class Box(PolyTube):
     """3D box builder from a generic polytube.
     """
-    def __init__(self, dx, dy, dz, **kwargs):
+    def __init__(self, dx, dy=None, dz=None, **kwargs):
         if "name" not in kwargs:
             kwargs["name"] = "box"
+        if dy is None: dy = dx
+        if dz is None:
+            if dy is None: dz = dx
+            else: dz = dy
         section = ((-0.5 * dx, -0.5 * dy), (-0.5 * dx, 0.5 * dy),
                    (0.5 * dx, 0.5 * dy), (0.5 * dx, -0.5 * dy))
         PolyTube.__init__(self, section, dz, **kwargs)

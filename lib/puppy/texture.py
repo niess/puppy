@@ -48,7 +48,7 @@ def load(path, anisotropic=None, mipmap=None, mirror=None):
         texture.setWrapV(Texture.WM_mirror)
     return texture
 
-def splatting(node, first, second, stencil, scale=None):
+def splatting(node, first, second, stencil, scale=None, offset=None):
     """Apply a texture splatting to the provided NodePath.
     """
     # Apply the first texture.
@@ -71,3 +71,7 @@ def splatting(node, first, second, stencil, scale=None):
       TextureStage.COSrcColor)
     node.setTexture(ts3, stencil)
     if scale: node.setTexScale(ts3, scale, scale)
+    if offset is not None:
+        node.setTexOffset(ts1, *offset)
+        node.setTexOffset(ts2, *offset)
+        node.setTexOffset(ts3, *offset)

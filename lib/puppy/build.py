@@ -118,6 +118,7 @@ class PolyTube(Builder):
         n0 = cross(v0, v1)
         n0 = multiply(1. / dot(n0, n0)**0.5, n0)
         n1 = multiply(-1., n0)
+        if dot(n, v2) < 0.: n0, n1 = n1, n0
         self._faces = [(self._vertices[0], n0), (self._vertices[n_vx], n1)]
         for i in xrange(n_vx):
             j = (i + 1) % n_vx
@@ -126,7 +127,7 @@ class PolyTube(Builder):
             r = [section[k][l] - section[i][l] for l in xrange(3)]
             n = cross(u0, v2)
             nrm = 1. / dot(n, n)**0.5
-            if dot(n, r) < 0.: nrm = -nrm
+            if dot(n, r) > 0.: nrm = -nrm
             n = multiply(nrm, n)
             self._faces.append((section[i], n))
 
@@ -262,17 +263,30 @@ class PolyTube(Builder):
         """
         if self.path is not None:
             M = self.path.getMat()
-            faces = [[list(M.xformVec(LVecBase3f(*v[0]))),
-                      list(M.xformPoint(LVecBase3f(*v[1])))]
+            faces = [[list(M.xformPoint(LVecBase3f(*v[0]))),
+                      list(M.xformVec(LVecBase3f(*v[1])))]
                      for v in self._faces]
         else:
             faces = self._faces
         return faces
 
-    def distance(self, point, direction=None):
+    def distance(self, point, direction=None, faces=None):
         """Compute the signed distance of a point to the closest face.
         """
-        pass
+        if faces is None: faces = self.faces()
+        if direction is None:
+            dmin, dmax = None, None
+            for o, n in faces:
+                d = (n[0] * (o[0] - point[0]) + n[1] * (o[1] - point[1]) +
+                     n[2] * (o[2] - point[2]))
+                if d < 0.:
+                    if (dmax is None) or (d > dmax): dmax = d
+                else:
+                    if (dmin is None) or (d < dmin): dmin = d
+            if dmax is None: return dmin
+            else: return dmax
+        else:
+            pass
 
 class Box(PolyTube):
     """3D box builder from a generic polytube.

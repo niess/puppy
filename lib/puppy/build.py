@@ -32,6 +32,11 @@ def multiply(s, v):
     """Multiply a vector with a scalar."""
     return (s * v[0], s * v[1], s * v[2])
 
+def unit(v):
+    """Return a unit vector along the given direction."""
+    nrm = 1. / dot(v, v)**0.5
+    return multiply(nrm, v)
+
 def dot(i,j):
     """Dot product of 2 vectors."""
     return i[0] * j[0] + i[1] * j[1] + i[2] * j[2]
@@ -73,10 +78,34 @@ class PolyTube(Builder):
 
         # Unpack the arguments.
         try:
+            # Base initialisation with a user defined frame.
             frame, vertices, length = args
         except ValueError:
-            vertices, length = args
-            frame = ((0., 0., 0.), ((1., 0., 0.), (0., 1., 0.), (0., 0., 1.)))
+            try:
+                # Initialisation assuming a standard frame.
+                vertices, length = args
+                frame = ((0., 0., 0.), ((1., 0., 0.), (0., 1., 0.),
+                  (0., 0., 1.)))
+            except ValueError:
+                # Initialisation from an ordered list of vertices. There must
+                # be an even number of vertices and the 1st and 2nd half must
+                # map to the faces of the PolyTube.
+                vertices = args[0]
+                origin = vertices[0]
+                n = len(vertices) / 2
+                v0 = unit([vertices[1][i] - vertices[0][i] for i in xrange(3)])
+                v2 = [vertices[n][i] - vertices[0][i] for i in xrange(3)]
+                v1 = unit(cross(v2, v0))
+                length = dot(v2, v2)**0.5
+                v2 = multiply(1. / length, v2)
+                origin = [origin[i] + 0.5 * length *v2[i] for i in xrange(3)]
+                frame = (origin, (v0, v1, v2))
+                section = []
+                for vertex in vertices[:n]:
+                    v = [vertex[i] - origin[i] for i in xrange(3)]
+                    section.append((dot(v, v0), dot(v, v1)))
+                vertices = section
+
         opts = { "name" : "polytube", "face_color" : (1,1,1,1),
           "line_color" : (0,0,0,1), "texture_scale" : None }
         for k, v in kwargs.items():
@@ -106,8 +135,8 @@ class PolyTube(Builder):
         n = cross(u0, u1)
         if dot(v2, n) < 0.:
             v0, v1 = v1, v0
-            vertices = vertices[::-1]
-            section = section[::-1]
+            vertices = [vertices[(1 - i) % n_vx] for i in xrange(n_vx)]
+            section = [section[(1 - i) % n_vx] for i in xrange(n_vx)]
         v2 = multiply(length, v2)
 
         # Build and export the vertices representation.
